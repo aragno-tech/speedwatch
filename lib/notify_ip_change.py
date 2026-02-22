@@ -4,7 +4,7 @@ import requests
 
 from speedwatch_lib import send_email, RECIPIENTS
 
-IP_STORE_PATH = "/home/netmon/mylib/currentip"
+IP_STORE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'var', 'currentip')
 
 
 def get_public_ip():

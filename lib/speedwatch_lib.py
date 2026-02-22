@@ -22,8 +22,11 @@ def write_file(text, filepath):
         f.write(text)
 
 
+LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'log', 'speed.log')
+
+
 def write_log(text):
-    write_file(text.rstrip() + "\n", "/home/netmon/log/speed.log")
+    write_file(text.rstrip() + "\n", LOG_PATH)
 
 
 def send_email(subject, body, recipients, sender=EMAIL_SENDER, password=EMAIL_PASSWORD):
