@@ -2,7 +2,6 @@ import smtplib
 from email.mime.text import MIMEText
 import socket
 import os
-import os.path
 from dotenv import load_dotenv
 from influxdb import InfluxDBClient
 import urllib3
@@ -13,16 +12,13 @@ EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
 INFLUXDB_URL = os.getenv("INFLUXDB_URL")
 INFLUXDB_DB = os.getenv("INFLUXDB_DB")
-
 RECIPIENTS = os.getenv("EMAIL_RECIPIENTS", "").split(",")
+LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'log', 'speed.log')
 
 
 def write_file(text, filepath):
     with open(filepath, 'a') as f:
         f.write(text)
-
-
-LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'log', 'speed.log')
 
 
 def write_log(text):
