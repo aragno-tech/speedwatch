@@ -14,7 +14,7 @@ INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
 INFLUXDB_URL = os.getenv("INFLUXDB_URL")
 INFLUXDB_DB = os.getenv("INFLUXDB_DB")
 
-RECIPIENTS = ["recipient@example.com"]
+RECIPIENTS = os.getenv("EMAIL_RECIPIENTS", "").split(",")
 
 
 def write_file(text, filepath):
