@@ -4,11 +4,12 @@ import sys
 import datetime
 import socket
 import time
+import os
 
 from lib.speedwatch_lib import write_log, send_email, create_influx_client, RECIPIENTS
 
 TEST_HOST = socket.gethostname()
-TEST_ADDRESS = "MB208"
+TEST_ADDRESS = os.getenv("SPEEDTEST_ADDRESS")
 
 
 def run_speedtest(server_id=None):

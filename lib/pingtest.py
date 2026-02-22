@@ -1,9 +1,13 @@
 import re
 import subprocess
 import sys
+import os
 import urllib3
 
 from speedwatch_lib import create_influx_client
+
+PING_HOST = os.getenv("PING_HOST")
+PING_ADDRESS = os.getenv("PING_ADDRESS")
 
 
 def run_ping(url):
@@ -31,8 +35,8 @@ def build_ping_payload(url, data):
         {
             "measurement": "ping",
             "tags": {
-                "host": "raspNetMon",
-                "address": "MB81",
+                "host": PING_HOST,
+                "address": PING_ADDRESS,
                 "url": url
             },
             "fields": {
