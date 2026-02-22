@@ -2,14 +2,12 @@ import re
 import subprocess
 import sys
 import datetime
-import socket
 import time
-import os
 
-from lib.speedwatch_lib import write_log, send_email, create_influx_client, RECIPIENTS
-
-TEST_HOST = socket.gethostname()
-TEST_ADDRESS = os.getenv("SPEEDTEST_ADDRESS")
+from lib.speedwatch_lib import (
+    write_log, send_email, create_influx_client,
+    build_influx_payload, RECIPIENTS, DEVICE_HOST, DEVICE_ADDRESS
+)
 
 
 def run_speedtest(server_id=None):
@@ -38,26 +36,6 @@ def parse_speedtest_output(response):
     }
 
 
-def build_speed_payload(data):
-    return [
-        {
-            "measurement": "Ookla",
-            "tags": {
-                "host": TEST_HOST,
-                "address": TEST_ADDRESS,
-                "server": data['server']
-            },
-            "fields": {
-                "download": float(data['download']),
-                "upload": float(data['upload']),
-                "ping": float(data['ping']),
-                "jitter": float(data['jitter']),
-                "ploss": float(data['ploss'])
-            }
-        }
-    ]
-
-
 def run_test_for_server(server_id=None):
     server_label = server_id if server_id else "closest"
     start_time = datetime.datetime.now()
@@ -66,15 +44,23 @@ def run_test_for_server(server_id=None):
         response = run_speedtest(server_id)
         if not response:
             write_log(f"(Speedtest error) Server not found: {server_label}")
-            send_email(f"Speedtest error: {TEST_HOST}", f"Server not found: {server_label}", RECIPIENTS)
+            send_email(f"Speedtest error: {DEVICE_HOST}", f"Server not found: {server_label}", RECIPIENTS)
             return
     except Exception as e:
         write_log(f"(Speedtest error) Exception for server {server_label}: {e}")
-        send_email(f"Speedtest error: {TEST_HOST}", f"Exception for server {server_label}\n\n{str(e)}", RECIPIENTS)
+        send_email(f"Speedtest error: {DEVICE_HOST}", f"Exception for server {server_label}\n\n{str(e)}", RECIPIENTS)
         return
 
     data = parse_speedtest_output(response)
-    payload = build_speed_payload(data)
+    tags = {"host": DEVICE_HOST, "address": DEVICE_ADDRESS, "server": data['server']}
+    fields = {
+        "download": float(data['download']),
+        "upload": float(data['upload']),
+        "ping": float(data['ping']),
+        "jitter": float(data['jitter']),
+        "ploss": float(data['ploss'])
+    }
+    payload = build_influx_payload("Ookla", tags, fields)
 
     client = create_influx_client()
     client.write_points(payload)

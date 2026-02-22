@@ -14,6 +14,12 @@ INFLUXDB_URL = os.getenv("INFLUXDB_URL")
 INFLUXDB_DB = os.getenv("INFLUXDB_DB")
 RECIPIENTS = os.getenv("EMAIL_RECIPIENTS", "").split(",")
 LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'log', 'speed.log')
+DEVICE_HOST = os.getenv("DEVICE_HOST") or socket.gethostname()
+DEVICE_ADDRESS = os.getenv("DEVICE_ADDRESS")
+
+
+def build_influx_payload(measurement, tags, fields):
+    return [{"measurement": measurement, "tags": tags, "fields": fields}]
 
 
 def write_file(text, filepath):
