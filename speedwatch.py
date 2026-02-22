@@ -5,7 +5,7 @@ import datetime
 import time
 
 from lib.speedwatch_lib import (
-    write_log, send_email, create_influx_client,
+    write_log, debug_log, send_email, create_influx_client,
     build_influx_payload, RECIPIENTS, DEVICE_HOST, DEVICE_ADDRESS
 )
 
@@ -61,8 +61,10 @@ def run_test_for_server(server_id=None):
         "ploss": float(data['ploss'])
     }
     payload = build_influx_payload("Ookla", tags, fields)
+    debug_log(f"Payload: {payload}")
 
     client = create_influx_client()
+    debug_log(f"InfluxDB client: {client}")
     client.write_points(payload)
 
     end_time = datetime.datetime.now()

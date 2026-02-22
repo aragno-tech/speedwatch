@@ -16,6 +16,8 @@ RECIPIENTS = os.getenv("EMAIL_RECIPIENTS", "").split(",")
 LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'log', 'speed.log')
 DEVICE_HOST = os.getenv("DEVICE_HOST") or socket.gethostname()
 DEVICE_ADDRESS = os.getenv("DEVICE_ADDRESS")
+LOG = os.getenv("LOG", "true").lower() == "true"
+DEBUG = os.getenv("DEBUG", "true").lower() == "true"
 
 
 def build_influx_payload(measurement, tags, fields):
@@ -28,7 +30,13 @@ def write_file(text, filepath):
 
 
 def write_log(text):
-    write_file(text.rstrip() + "\n", LOG_PATH)
+    if LOG:
+        write_file(text.rstrip() + "\n", LOG_PATH)
+
+
+def debug_log(text):
+    if DEBUG:
+        print(text)
 
 
 def send_email(subject, body, recipients, sender=EMAIL_SENDER, password=EMAIL_PASSWORD):
