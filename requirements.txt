@@ -1,0 +1,13 @@
+# This project runs on Raspberry Pi OS (Debian Bookworm) which restricts
+# system-wide pip installs (PEP 668). Some packages are best installed via apt:
+#
+#   sudo apt install python3-influxdb python3-requests python3-urllib3
+#
+# For packages not available via apt, use pip with --user or a virtualenv:
+#
+#   pip3 install python-dotenv
+
+python-dotenv==1.2.1
+influxdb==5.3.1
+requests==2.28.1
+urllib3==1.26.12
