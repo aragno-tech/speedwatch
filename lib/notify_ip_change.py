@@ -25,6 +25,7 @@ def has_public_ip_changed(ip_store_path, recipients):
                 print(text)
                 send_email("IP Address Change", text, recipients)
     else:
+        # First run: store file doesn't exist yet, create it
         update_ip_store(ip_addr, ip_store_path)
 
 

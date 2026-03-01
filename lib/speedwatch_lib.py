@@ -12,6 +12,7 @@ EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
 INFLUXDB_URL = os.getenv("INFLUXDB_URL")
 INFLUXDB_DB = os.getenv("INFLUXDB_DB")
+# EMAIL_RECIPIENTS is expected as a comma-separated string in .env
 RECIPIENTS = os.getenv("EMAIL_RECIPIENTS", "").split(",")
 LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'log', 'speed.log')
 DEVICE_HOST = os.getenv("DEVICE_HOST") or socket.gethostname()
@@ -59,7 +60,7 @@ def create_influx_client():
         port=443,
         ssl=True,
         database=INFLUXDB_DB,
-        username='',
+        username='',  # InfluxDB v1 compatibility: token is passed as password
         password=INFLUXDB_TOKEN,
         headers={'Content-Type': 'text/plain; charset=utf-8'}
     )

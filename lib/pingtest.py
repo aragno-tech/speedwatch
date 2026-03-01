@@ -19,7 +19,9 @@ def run_ping(url):
 
 
 def parse_ping_output(response):
+    # Matches "N received, X% packet loss" from ping summary line
     packet_loss = re.search(r'received,\s+(.*?)%', response, re.MULTILINE)
+    # Matches "rtt min/avg/max/mdev = X/X/X/X ms" from ping statistics line
     ping_stats = re.search(r'mdev =\s(.*?)/(.*?)/(.*?)/(.*?)\s', response, re.MULTILINE)
     return {
         'packet_loss': packet_loss.group(1),

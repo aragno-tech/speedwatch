@@ -12,6 +12,7 @@ from lib.speedwatch_lib import (
 
 def run_speedtest(server_id=None):
     server_arg = f" -s {server_id}" if server_id else ""
+    # --accept-license and --accept-gdpr are required for non-interactive/headless use
     return subprocess.Popen(
         '/usr/bin/speedtest --accept-license --accept-gdpr' + server_arg,
         shell=True,
@@ -81,6 +82,7 @@ if __name__ == "__main__":
     if server_ids:
         for i, server_id in enumerate(server_ids):
             run_test_for_server(server_id)
+            # Sleep between servers to avoid network contention within the same cron job
             if i < len(server_ids) - 1:
                 time.sleep(90)
     else:
