@@ -6,6 +6,7 @@ import urllib3
 
 from speedwatch_lib import create_influx_client, build_influx_payload, write_log, DEVICE_HOST, DEVICE_ADDRESS
 
+# .env is loaded by speedwatch_lib on import, making os.getenv() available here
 PING_COUNT = int(os.getenv("PING_COUNT", "10"))
 
 
