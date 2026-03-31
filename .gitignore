@@ -1,3 +1,6 @@
 .env
 *.log
-var/currentip
+var/
+__pycache__/
+CLAUDE.md
+HANDOFF.md

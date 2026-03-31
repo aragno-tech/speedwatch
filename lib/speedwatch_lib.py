@@ -19,6 +19,8 @@ DEVICE_HOST = os.getenv("DEVICE_HOST") or socket.gethostname()
 DEVICE_ADDRESS = os.getenv("DEVICE_ADDRESS")
 LOG = os.getenv("LOG", "true").lower() == "true"
 DEBUG = os.getenv("DEBUG", "true").lower() == "true"
+SERVER_COUNT = int(os.getenv("SERVER_COUNT", "5"))
+FALLBACK_COUNT = int(os.getenv("FALLBACK_COUNT", "7"))
 
 
 def build_influx_payload(measurement, tags, fields):
