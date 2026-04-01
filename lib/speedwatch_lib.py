@@ -20,7 +20,7 @@ DEVICE_ADDRESS = os.getenv("DEVICE_ADDRESS")
 LOG = os.getenv("LOG", "true").lower() == "true"
 DEBUG = os.getenv("DEBUG", "true").lower() == "true"
 SERVER_COUNT = int(os.getenv("SERVER_COUNT", "5"))
-FALLBACK_COUNT = int(os.getenv("FALLBACK_COUNT", "7"))
+MONITOR_SERVER_IDS = [s.strip() for s in os.getenv("MONITOR_SERVER_IDS", "").split(",") if s.strip()]
 
 
 def build_influx_payload(measurement, tags, fields):

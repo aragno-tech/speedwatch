@@ -1,31 +1,33 @@
 import os
-import xml.etree.ElementTree as ET
-import requests
+import re
+import subprocess
 
 try:
-    from lib.speedwatch_lib import send_email, write_log, RECIPIENTS, SERVER_COUNT, FALLBACK_COUNT
+    from lib.speedwatch_lib import send_email, write_log, RECIPIENTS, SERVER_COUNT, MONITOR_SERVER_IDS
 except ImportError:
-    from speedwatch_lib import send_email, write_log, RECIPIENTS, SERVER_COUNT, FALLBACK_COUNT
+    from speedwatch_lib import send_email, write_log, RECIPIENTS, SERVER_COUNT, MONITOR_SERVER_IDS
 
-OOKLA_STATIC_URL = "https://c.speedtest.net/speedtest-servers-static.php"
 LAST_SERVER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'var', 'last_server_id')
 KNOWN_SERVERS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'var', 'known_servers')
 
 
-def fetch_server_list():
-    """Fetch SERVER_COUNT + FALLBACK_COUNT servers from the Ookla static list as [{id, name}]."""
-    response = requests.get(OOKLA_STATIC_URL, timeout=10)
-    response.raise_for_status()
-    root = ET.fromstring(response.text)
+def fetch_server_list_from_cli():
+    """Run speedtest -L and return list of {id, name} dicts in proximity order."""
+    output = subprocess.Popen(
+        '/usr/bin/speedtest -L --accept-license --accept-gdpr',
+        shell=True, stdout=subprocess.PIPE
+    ).stdout.read().decode('utf-8')
     servers = []
-    total = SERVER_COUNT + FALLBACK_COUNT
-    for server in root.iter('server'):
-        servers.append({
-            'id': server.attrib['id'],
-            'name': f"{server.attrib.get('sponsor', '')} ({server.attrib.get('name', '')}, {server.attrib.get('country', '')})"
-        })
-        if len(servers) >= total:
-            break
+    past_header = False
+    for line in output.splitlines():
+        if line.startswith('='):
+            past_header = True
+            continue
+        if not past_header or not line.strip():
+            continue
+        parts = re.split(r'\s{2,}', line.strip())
+        if len(parts) >= 3:
+            servers.append({'id': parts[0], 'name': f"{parts[1]} - {parts[2]}"})
     return servers
 
 
@@ -60,22 +62,31 @@ def get_server_candidates():
     Returns (preferred, fallbacks) with no side effects.
 
     preferred  -- {id, name} dict for the next server in the preferred rotation
-    fallbacks  -- list of {id, name} dicts for servers beyond SERVER_COUNT (tried if preferred fails)
+    fallbacks  -- list of {id, name} dicts for all non-preferred servers from speedtest -L
     """
-    servers = fetch_server_list()
-    if not servers:
-        raise RuntimeError("No servers returned from Ookla static list")
+    servers = fetch_server_list_from_cli()
+    server_map = {s['id']: s for s in servers}
 
-    preferred_pool = servers[:SERVER_COUNT]
-    fallback_pool = servers[SERVER_COUNT:]
+    if MONITOR_SERVER_IDS:
+        # Explicit preferred pool from config; fall back to placeholder name if not in -L
+        preferred_pool = [
+            server_map.get(sid, {'id': sid, 'name': f'server {sid}'})
+            for sid in MONITOR_SERVER_IDS
+        ]
+        preferred_ids = set(MONITOR_SERVER_IDS)
+        fallback_pool = [s for s in servers if s['id'] not in preferred_ids]
+    else:
+        # No explicit preferred list — use first SERVER_COUNT servers from -L
+        preferred_pool = servers[:SERVER_COUNT]
+        preferred_ids = {s['id'] for s in preferred_pool}
+        fallback_pool = [s for s in servers if s['id'] not in preferred_ids]
+
+    if not preferred_pool:
+        raise RuntimeError("No preferred servers available")
 
     last_id = read_last_server_id()
     ids = [s['id'] for s in preferred_pool]
-
-    if last_id in ids:
-        next_index = (ids.index(last_id) + 1) % len(preferred_pool)
-    else:
-        next_index = 0
+    next_index = (ids.index(last_id) + 1) % len(preferred_pool) if last_id in ids else 0
 
     return preferred_pool[next_index], fallback_pool
 
