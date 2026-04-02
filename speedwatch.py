@@ -6,7 +6,8 @@ import time
 
 from lib.speedwatch_lib import (
     write_log, debug_log, send_email, create_influx_client,
-    build_influx_payload, RECIPIENTS, DEVICE_HOST, DEVICE_ADDRESS
+    build_influx_payload, RECIPIENTS, DEVICE_HOST, DEVICE_ADDRESS,
+    is_throttle_blocked, set_throttle_block
 )
 from lib.server_selector import get_server_candidates, record_server_used
 
@@ -14,11 +15,14 @@ from lib.server_selector import get_server_candidates, record_server_used
 def run_speedtest(server_id=None):
     server_arg = f" -s {server_id}" if server_id else ""
     # --accept-license and --accept-gdpr are required for non-interactive/headless use
-    return subprocess.Popen(
+    proc = subprocess.Popen(
         '/usr/bin/speedtest --accept-license --accept-gdpr -f json --progress=no' + server_arg,
         shell=True,
-        stdout=subprocess.PIPE
-    ).stdout.read().decode('utf-8')
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    stdout, stderr = proc.communicate()
+    return stdout.decode('utf-8'), stderr.decode('utf-8')
 
 
 def parse_speedtest_json(response):
@@ -37,20 +41,31 @@ def parse_speedtest_json(response):
 def run_test_for_server(server_id=None):
     """Run a speedtest against the given server. Returns True on success, False on failure."""
     server_label = server_id if server_id else "closest"
+
+    if is_throttle_blocked():
+        write_log(f"(Throttle block) Skipping speedtest — cooling down for 1 hour")
+        debug_log("Throttle block active, skipping")
+        return False
+
     start_time = datetime.datetime.now()
 
     try:
-        response = run_speedtest(server_id)
-        if not response:
+        stdout, stderr = run_speedtest(server_id)
+        if "Limit reached" in stderr or "Limit reached" in stdout:
+            set_throttle_block()
+            write_log(f"(Throttle) Ookla rate limit hit — blocking CLI for 1 hour")
+            send_email(f"Speedtest throttled: {DEVICE_HOST}", "Ookla rate limit hit. CLI blocked for 1 hour.", RECIPIENTS)
+            return False
+        if not stdout:
             write_log(f"(Speedtest error) Server not found: {server_label}")
-            send_email(f"Speedtest error: {DEVICE_HOST}", f"Server not found: {server_label}", RECIPIENTS)
+            send_email(f"Speedtest error: {DEVICE_HOST}", f"Server not found: {server_label}\n\n{stderr}", RECIPIENTS)
             return False
     except Exception as e:
         write_log(f"(Speedtest error) Exception for server {server_label}: {e}")
-        send_email(f"Speedtest error: {DEVICE_HOST}", f"Exception for server {server_label}\n\n{str(e)}", RECIPIENTS)
+        send_email(f"Speedtest error: {DEVICE_HOST}", f"Exception for server {server_label}\n\n{str(e)}\n\n{stderr}", RECIPIENTS)
         return False
 
-    data = parse_speedtest_json(response)
+    data = parse_speedtest_json(stdout)
     tags = {"host": DEVICE_HOST, "address": DEVICE_ADDRESS, "server": data['server']}
     fields = {
         "download": float(data['download']),
@@ -63,7 +78,6 @@ def run_test_for_server(server_id=None):
     debug_log(f"Payload: {payload}")
 
     client = create_influx_client()
-    debug_log(f"InfluxDB client: {client}")
     client.write_points(payload)
 
     end_time = datetime.datetime.now()
@@ -79,6 +93,15 @@ if __name__ == "__main__":
         import lib.speedwatch_lib as _swlib
         _swlib.DEBUG = True
         args = [a for a in args if a not in ('-v', '--verbose')]
+    if '--test-write' in args:
+        payload = build_influx_payload(
+            'Ookla',
+            {'host': DEVICE_HOST, 'address': DEVICE_ADDRESS, 'server': 'test'},
+            {'download': 1.0, 'upload': 1.0, 'ping': 1.0, 'jitter': 1.0, 'ploss': 0.0}
+        )
+        create_influx_client().write_points(payload)
+        print('InfluxDB write OK')
+        sys.exit(0)
     server_ids = args
     script_start_time = datetime.datetime.now()
     write_log(f"--START-- {script_start_time.strftime('%H:%M:%S')} --START--")
