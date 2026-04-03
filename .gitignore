@@ -1,4 +1,4 @@
-.env
+.env*
 *.log
 var/
 __pycache__/
