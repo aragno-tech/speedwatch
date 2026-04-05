@@ -1,7 +1,109 @@
-# Speedwatch: InfluxDB + Grafana Setup Guide
+# Speedwatch: Setup Guide
 
-This guide walks through creating free cloud accounts for InfluxDB and Grafana,
-connecting them together, and building a basic speedtest dashboard.
+This guide covers both setup modes. Start with whichever fits your situation.
+
+- **Single-home (SQLite)** — one device, no cloud accounts, local dashboard
+- **Multi-location (InfluxDB + Grafana)** — multiple devices, shared cloud dashboard
+
+---
+
+## Single-home setup (SQLite)
+
+### 1. Install the speedtest CLI
+
+The Ookla speedtest CLI must be installed before running setup:
+
+```bash
+curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash
+sudo apt install speedtest
+```
+
+Verify it works:
+
+```bash
+speedtest --version
+```
+
+### 2. Download speedwatch and run setup
+
+```bash
+git clone https://github.com/aragno-tech/speedwatch
+cd speedwatch
+bash setup.sh
+```
+
+The script will:
+- Install Python dependencies
+- Ask for a device name, location label, and Ookla server IDs
+- Write your `.env` file
+- Verify the database works
+- Optionally add cron entries for automatic tests and dashboard autostart
+
+That's it for the guided path. The rest of this section covers what the script does manually, if you prefer to configure it yourself.
+
+---
+
+### Manual setup (optional)
+
+#### Configure `.env`
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` — minimum required keys for SQLite mode:
+
+```
+STORAGE=sqlite
+DEVICE_HOST=my-pi          # label shown in dashboard
+DEVICE_ADDRESS=home        # location label
+MONITOR_SERVER_IDS=8018,12919,31861   # comma-separated Ookla server IDs
+```
+
+Leave all `INFLUXDB_*` keys blank — they are not used in SQLite mode.
+
+#### Run a test
+
+```bash
+python3 speedwatch.py --test-write   # verify DB write works
+python3 speedwatch.py                # run one speed test
+```
+
+Results are written to `var/speeds.db`.
+
+#### View the dashboard
+
+```bash
+python3 dashboard.py
+```
+
+Open `http://localhost:8080` in a browser.
+
+To start the dashboard automatically on reboot, add to crontab:
+
+```
+@reboot cd /path/to/speedwatch && python3 dashboard.py >> log/dashboard.log 2>&1
+```
+
+#### Schedule speed tests
+
+```bash
+crontab -e
+```
+
+Add (runs every 30 minutes):
+
+```
+*/30 * * * * cd /path/to/speedwatch && python3 speedwatch.py >> log/cron.log 2>&1
+```
+
+---
+
+## Multi-location setup (InfluxDB + Grafana)
+
+The recommended order is to **collect all your credentials first** (Parts 1 and 2), then
+configure the Pi in one sitting (Part 3), and finally connect Grafana (Part 4).
+This avoids switching back and forth mid-setup.
 
 ---
 
@@ -25,6 +127,9 @@ A bucket is where your time-series data is stored.
 3. Click **CREATE BUCKET**
 4. Name it `speedwatch` — this will be your `INFLUXDB_BUCKET` value
 5. Click **Create**
+6. On the Buckets page, note down the **bucket ID** shown next to the bucket name
+   (it looks like a hex string, e.g. `a1b2c3d4e5f6a1b2`) — you will need this when
+   connecting Grafana in Part 4
 
 ### 1.3 Create an API token
 
@@ -49,43 +154,98 @@ A bucket is where your time-series data is stored.
 > first write. This is a normal v1→v2 compatibility mapping (DBRP) and can be ignored —
 > your data is stored in the `speedwatch` bucket.
 
----
+### Credentials checklist
 
-## Part 2 — Configure `.env`
+Before moving on, make sure you have noted down:
 
-Edit `/home/netmon/speedwatch/.env` (create from `.env.example` if it doesn't exist):
-
-```
-INFLUXDB_URL=us-east-1-1.aws.cloud2.influxdata.com   # host only, no https://
-INFLUXDB_TOKEN=your_token_here
-INFLUXDB_BUCKET=speedwatch                             # must match bucket name
-```
-
-### 2.1 Verify the connection
-
-Run a manual speedtest to confirm data lands in InfluxDB:
-
-```bash
-cd /home/netmon/speedwatch
-python3 speedwatch.py -v
-```
-
-Then in InfluxDB Cloud, go to **Data Explorer**, select your bucket and the
-`Ookla` measurement — you should see a data point within a minute or two.
+- [ ] `INFLUXDB_URL` — host only, no `https://`
+- [ ] `INFLUXDB_TOKEN` — all-access token
+- [ ] `INFLUXDB_BUCKET` — `speedwatch` (or whatever you named it)
+- [ ] Bucket ID — the hex ID from the Buckets page (needed for Grafana in Part 4)
 
 ---
 
-## Part 3 — Grafana Cloud (free account)
+## Part 2 — Grafana Cloud (free account)
 
-### 3.1 Create account
+### 2.1 Create account
 
 1. Go to **grafana.com** and click **Create free account**
 2. Sign up with email or GitHub/Google
 3. You get a hosted Grafana instance at `https://yourname.grafana.net`
 
-### 3.2 Add InfluxDB as a data source
+No further configuration is needed here yet — you will connect InfluxDB as a data
+source in Part 4, after the Pi is set up and sending data.
 
-1. In Grafana, go to **Connections → Data sources** (or **Configuration → Data Sources**)
+---
+
+## Part 3 — Set up the Pi
+
+### 3.1 Install the speedtest CLI
+
+```bash
+curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash
+sudo apt install speedtest
+speedtest --version
+```
+
+### 3.2 Download speedwatch and install dependencies
+
+```bash
+git clone https://github.com/aragno-tech/speedwatch
+cd speedwatch
+pip3 install -r requirements.txt
+```
+
+> On Raspberry Pi OS (Bookworm), if pip3 gives a "externally managed environment" error:
+> `pip3 install -r requirements.txt --user`
+
+### 3.3 Configure `.env`
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with the credentials from your checklist:
+
+```
+STORAGE=influxdb
+INFLUXDB_URL=eu-central-1-1.aws.cloud2.influxdata.com   # host only, no https://
+INFLUXDB_TOKEN=your_all_access_token_here
+INFLUXDB_BUCKET=speedwatch
+DEVICE_HOST=pi-home        # label for this device
+DEVICE_ADDRESS=home        # location label
+MONITOR_SERVER_IDS=8018,12919,31861
+```
+
+### 3.4 Verify the connection
+
+```bash
+python3 speedwatch.py --test-write
+# Expected: influxdb write OK
+```
+
+Then in InfluxDB Cloud, go to **Data Explorer**, select your bucket and the
+`Ookla` measurement — you should see a data point appear.
+
+### 3.5 Schedule speed tests
+
+```bash
+crontab -e
+```
+
+Add (runs every 30 minutes):
+
+```
+*/30 * * * * cd /path/to/speedwatch && python3 speedwatch.py >> log/cron.log 2>&1
+```
+
+---
+
+## Part 4 — Connect Grafana to InfluxDB
+
+### 4.1 Add InfluxDB as a data source
+
+1. In Grafana, go to **Connections → Data sources**
 2. Click **+ Add new data source**
 3. Search for and select **InfluxDB**
 4. Configure:
@@ -93,84 +253,62 @@ Then in InfluxDB Cloud, go to **Data Explorer**, select your bucket and the
 | Field | Value |
 |-------|-------|
 | Query language | **InfluxQL** |
-| URL | `https://us-east-1-1.aws.cloud2.influxdata.com` (your full URL with https://) |
+| URL | `https://eu-central-1-1.aws.cloud2.influxdata.com` (full URL with `https://`) |
 | Database | `speedwatch` (your bucket name) |
-| User | bucket ID (copy from the InfluxDB Buckets page — the hex ID next to your bucket name) |
-| Password | paste your InfluxDB API token |
+| User | your bucket ID (the hex ID from Part 1 step 1.2) |
+| Password | your all-access API token |
 | HTTP Method | GET |
 
 5. Click **Save & Test** — you should see a green "datasource is working" message
 
-> The project uses the InfluxDB v1 compatibility API. The bucket ID in User and
-> the API token in Password are both required for Grafana to authenticate correctly.
+> The bucket ID (not the bucket name) goes in the User field. Find it on the InfluxDB
+> Buckets page. The API token goes in Password.
 
----
-
-## Part 4 — Create a Dashboard
-
-### 4.1 New dashboard
+### 4.2 Create a dashboard
 
 1. Click **+** in the sidebar → **New dashboard**
-2. Click **+ Configure**
+2. Click **+ Add visualization**
+3. Select your InfluxDB data source
 
-### 4.2 Download speed panel
+For each panel, switch to **Code** mode in the query editor and enter one of these queries:
 
-1. Select your InfluxDB data source
-2. Switch to **Code** mode in the query editor (click the small pencil icon)
-3. Enter:
-
+**Download speed**
 ```sql
 SELECT "download" FROM "Ookla" WHERE $timeFilter GROUP BY "server"::tag
 ```
 
-4. Select **Time series** visualization
-5. Set **Panel title** to `Download Speed`
-6. Hit **Save**, then navigate back to the dashboard
-
-### 4.3 Upload speed panel
-
-1. Click **Add new element** (blue + sign on the right) to add a new panel
-2. Select your InfluxDB data source
-3. Switch to **Code** mode in the query editor (click the small pencil icon)
-4. Enter:
-
+**Upload speed**
 ```sql
 SELECT "upload" FROM "Ookla" WHERE $timeFilter GROUP BY "server"::tag
 ```
 
-5. Select **Time series** visualization
-6. Set **Panel title** to `Upload Speed`
-7. Hit **Save**, then navigate back to the dashboard
-
-### 4.4 Ping / latency panel
-
-1. Click **Add new element** (blue + sign on the right) to add a new panel
-2. Select your InfluxDB data source
-3. Switch to **Code** mode in the query editor (click the small pencil icon)
-4. Enter:
-
+**Ping and jitter**
 ```sql
 SELECT "ping", "jitter" FROM "Ookla" WHERE $timeFilter GROUP BY "server"::tag
 ```
 
-5. Select **Time series** visualization
-6. Set **Panel title** to `Ping & Jitter`
-7. Hit **Save**, then navigate back to the dashboard
-
-### 4.5 Packet loss panel
-
-1. Click **Add new element** (blue + sign on the right) to add a new panel
-2. Select your InfluxDB data source
-3. Switch to **Code** mode in the query editor (click the small pencil icon)
-4. Enter:
-
+**Packet loss**
 ```sql
 SELECT "ploss" FROM "Ookla" WHERE $timeFilter GROUP BY "server"::tag
 ```
 
-5. Select **Time series** visualization
-6. Set **Panel title** to `Packet Loss`
-7. Hit **Save**, then navigate back to the dashboard
+Select **Time series** visualization for each panel, give it a title, and save.
+
+---
+
+## Finding Ookla server IDs
+
+Both modes use `MONITOR_SERVER_IDS` to define a pool of preferred servers.
+
+```bash
+speedtest -L
+```
+
+Pick stable servers geographically close to you and add their IDs as a comma-separated list:
+
+```
+MONITOR_SERVER_IDS=8018,12919,31861
+```
 
 ---
 
@@ -182,7 +320,7 @@ The speedwatch script writes to InfluxDB with this structure:
 |---------|-------|
 | Measurement | `Ookla` |
 | Tag: host | hostname of the Pi |
-| Tag: address | IP address (from `.env`) |
+| Tag: address | location label (from `.env`) |
 | Tag: server | e.g. `NextGenTel AS - Oslo (id: 8018)` |
 | Field: download | Mbps (float) |
 | Field: upload | Mbps (float) |

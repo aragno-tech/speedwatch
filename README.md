@@ -1,165 +1,74 @@
 # speedwatch
 
 Automated internet speed monitoring for Raspberry Pi (or any Linux box).
-Runs `speedtest` on a cron schedule, rotates between preferred Ookla servers,
-and stores results in your choice of backend.
 
 ---
 
-## Choose your setup
+## Why this exists
 
-| | Multi-location (InfluxDB) | Single-home (SQLite) |
-|---|---|---|
-| Storage | InfluxDB Cloud (free tier) | Local file (`var/speeds.db`) |
-| Dashboard | Grafana Cloud | Built-in (`dashboard.py`) |
-| Requires cloud accounts | Yes | No |
-| Best for | Multiple Pi devices, shared dashboards | Single device, no cloud |
+My internet connection was unstable — drops, slowdowns, the usual. When I called support, the answer was always "everything looks fine on our end." Talking to neighbours, they had the same experience. Nobody had data, just complaints.
+
+So I set up a Raspberry Pi to run automated speed tests around the clock. When I sat down with support and showed them a chart of degraded performance over weeks — times, dates, measured values — the conversation changed. The fault was found and fixed quickly.
+
+A neighbour wanted the same setup. That's when the multi-location mode (InfluxDB + Grafana) was added, so several households could feed into one shared dashboard. The simpler single-device mode is for anyone who just wants to monitor their own connection without cloud accounts.
+
+If you're having the same argument with your ISP, maybe this helps.
 
 ---
 
-## Setup: Single-home (SQLite)
+## What it does
 
-### 1. Clone and install
+- Runs `speedtest` on a cron schedule
+- Rotates between a pool of preferred Ookla servers
+- Writes results to SQLite (local) or InfluxDB (cloud)
+- Built-in browser dashboard for SQLite mode; Grafana for InfluxDB mode
+- Optional email alerts when a new server is used or results look unusual
+
+---
+
+## Modes
+
+|                         | Single-home (SQLite)         | Multi-location (InfluxDB)          |
+|-------------------------|------------------------------|------------------------------------|
+| Storage                 | Local file (`var/speeds.db`) | InfluxDB Cloud (free tier)         |
+| Dashboard               | Built-in (`dashboard.py`)    | Grafana Cloud                      |
+| Cloud accounts required | No                           | Yes                                |
+| Best for                | One device, no cloud         | Multiple devices, shared dashboard |
+
+---
+
+## Quick start
+
+**Step 1 — Install the Ookla speedtest CLI** (required by both modes):
 
 ```bash
-git clone <repo-url> speedwatch
+curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash
+sudo apt install speedtest
+```
+
+**Step 2 — Download and run setup:**
+
+```bash
+git clone https://github.com/aragno-tech/speedwatch
 cd speedwatch
-pip3 install -r requirements.txt
+bash setup.sh
 ```
 
-### 2. Configure `.env`
+The setup script installs dependencies, walks you through configuration, and optionally sets up cron.
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env` — the minimum required keys for SQLite mode:
-
-```
-STORAGE=sqlite
-DEVICE_HOST=my-pi          # label shown in dashboard
-DEVICE_ADDRESS=home        # location label
-EMAIL_SENDER=              # optional — leave blank to disable email alerts
-EMAIL_PASSWORD=
-EMAIL_RECIPIENTS=
-MONITOR_SERVER_IDS=8018,12919,31861   # comma-separated Ookla server IDs
-```
-
-Leave all `INFLUXDB_*` keys blank — they are not used in SQLite mode.
-
-### 3. Run a test
-
-```bash
-python3 speedwatch.py --test-write   # verify DB write works
-python3 speedwatch.py                # run one speed test
-```
-
-Results are written to `var/speeds.db`.
-
-### 4. View the dashboard
-
-```bash
-python3 dashboard.py
-```
-
-Open `http://localhost:8080` in a browser.
-To run on startup, add to crontab: `@reboot cd /path/to/speedwatch && python3 dashboard.py &`
-
-### 5. Schedule speed tests
-
-```bash
-crontab -e
-```
-
-Add (runs every 30 minutes):
-```
-*/30 * * * * cd /path/to/speedwatch && python3 speedwatch.py >> log/cron.log 2>&1
-```
+For the multi-location mode (InfluxDB + Grafana) or manual setup: [SETUP_GUIDE.md](SETUP_GUIDE.md)
 
 ---
 
-## Setup: Multi-location (InfluxDB + Grafana)
+## Requirements
 
-### 1. Clone and install
-
-```bash
-git clone <repo-url> speedwatch
-cd speedwatch
-pip3 install -r requirements.txt
-```
-
-### 2. Create free cloud accounts
-
-- **InfluxDB Cloud** — create a free account, create a bucket named `speedwatch`,
-  generate an all-access API token (scoped tokens do not work with the v1 compat API).
-- **Grafana Cloud** — create a free account.
-
-### 3. Configure `.env`
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-
-```
-STORAGE=influxdb
-INFLUXDB_URL=<your-influxdb-host>        # host only, no https://
-INFLUXDB_TOKEN=<all-access-token>
-INFLUXDB_BUCKET=speedwatch
-DEVICE_HOST=pi-home
-DEVICE_ADDRESS=home
-EMAIL_SENDER=you@gmail.com
-EMAIL_PASSWORD=<app-password>
-EMAIL_RECIPIENTS=you@gmail.com
-MONITOR_SERVER_IDS=8018,12919,31861
-```
-
-### 4. Verify InfluxDB connection
-
-```bash
-python3 speedwatch.py --test-write
-# Expected: influxdb write OK
-```
-
-### 5. Connect Grafana to InfluxDB
-
-In Grafana: **Connections → Data Sources → Add → InfluxDB**
-
-| Field | Value |
-|---|---|
-| Query language | InfluxQL |
-| URL | `https://<your-influxdb-host>` |
-| Database | `speedwatch` |
-| User | your InfluxDB bucket ID |
-| Password | your all-access token |
-
-> Note: use bucket ID (not name) as the Grafana username. Find it in InfluxDB under **Buckets**.
-
-### 6. Schedule speed tests
-
-```bash
-crontab -e
-```
-
-Add (runs every 30 minutes):
-```
-*/30 * * * * cd /path/to/speedwatch && python3 speedwatch.py >> log/cron.log 2>&1
-```
+- Raspberry Pi or any Linux box
+- Python 3
+- [Ookla speedtest CLI](https://www.speedtest.net/apps/cli)
 
 ---
 
-## Finding Ookla server IDs
-
-```bash
-speedtest -L
-```
-
-Pick stable servers geographically close to you. Set them in `MONITOR_SERVER_IDS`.
-
----
-
-## Other monitors
+## Other tools
 
 | Script | What it does |
 |---|---|
