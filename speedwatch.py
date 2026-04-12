@@ -30,7 +30,7 @@ def parse_speedtest_json(response):
     data = json.loads(response)
     srv = data['server']
     return {
-        'server':   f"{srv['name']} - {srv['location']} (id: {srv['id']})",
+        'server':   f"{srv['name']} - {srv['location']}",
         'ping':     data['ping']['latency'],
         'jitter':   data['ping']['jitter'],
         'download': data['download']['bandwidth'] * 8 / 1_000_000,
