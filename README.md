@@ -1,16 +1,20 @@
 # speedwatch
 
-Automated internet speed monitoring for Raspberry Pi (or any Linux box).
+Monitor internet speed over time on a Raspberry Pi — or any Linux box. Logs every result to a database, shows trends in a dashboard, and gives you real data to bring to your ISP.
 
 ---
 
 ## Why this exists
 
-My internet connection was unstable — drops, slowdowns, the usual. When I called support, the answer was always "everything looks fine on our end." Talking to neighbours, they had the same experience. Nobody had data, just complaints.
+My internet connection was unstable — drops, slowdowns, the usual. When I called support, the answer was always "everything looks fine on our end." Support could never reproduce it — the drops happened at odd hours, and intermittent faults are hard to catch in real-time. Talking to neighbors, I realized they had the same experience. Nobody had data, just complaints.
 
-So I set up a Raspberry Pi to run automated speed tests around the clock. When I sat down with support and showed them a chart of degraded performance over weeks — times, dates, measured values — the conversation changed. The fault was found and fixed quickly.
+So I set up a Raspberry Pi to run automated speed tests around the clock, logging the results to an InfluxDB database and displaying them in Grafana. Multi-location monitoring was part of the design from day one, so it was straightforward to add a second device at a neighbor's house feeding the same shared dashboard.
 
-A neighbour wanted the same setup. That's when the multi-location mode (InfluxDB + Grafana) was added, so several households could feed into one shared dashboard. The simpler single-device mode is for anyone who just wants to monitor their own connection without cloud accounts.
+When I finally sat down with support and showed them a chart of degraded performance over several weeks — complete with precise times, dates, and measured values — the conversation changed instantly. With concrete data on the table, the fault was identified and fixed quickly.
+
+However, the value of the setup didn't end there. Because the neighborhood had struggled with instability for so long, many neighbors remained suspicious and were quick to blame the ISP every time they experienced a glitch. By deploying a Pi to their homes, we could quickly determine if the issue was a legitimate line fault or simply a local Wi-Fi bottleneck.
+
+Most of the time, the data now shows that the ISP is delivering as promised, and the issue lies within the home network. These devices have been running ever since, providing us with peace of mind and the confidence of knowing exactly who to call when things go wrong.
 
 If you're having the same argument with your ISP, maybe this helps.
 
