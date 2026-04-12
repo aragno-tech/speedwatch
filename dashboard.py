@@ -89,8 +89,9 @@ fetch('/data').then(r => r.json()).then(rows => {
     if (!serverMap[r.server]) serverMap[r.server] = [];
     serverMap[r.server].push(r.download);
   });
-  const serverNames = Object.keys(serverMap);
-  const serverAvgs = serverNames.map(s => {
+  const serverKeys = Object.keys(serverMap);
+  const serverNames = serverKeys.map(s => s.replace(/ \(id: \d+\)$/, ''));
+  const serverAvgs = serverKeys.map(s => {
     const vals = serverMap[s];
     return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
   });
