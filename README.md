@@ -41,6 +41,39 @@ If you're having the same argument with your ISP, maybe this helps.
 
 ---
 
+## Dashboard
+
+### InfluxDB + Grafana mode
+
+The Grafana dashboard is organized into three sections: a **Readme** panel explaining
+the metrics, an **Overview** with the latest gauge readings per server, and a
+**Timeline** for historical analysis.
+
+![Download speed across two monitors over 7 days](docs/screenshot-timeline-multimon.png)
+*Two monitors reporting independently over 7 days. Each dip is timestamped and
+measurable — the kind of data that changes the conversation with your ISP.*
+
+![Download and upload over time](docs/screenshot-timeline.png)
+*Download and upload trends over time from a single monitor.*
+
+![Latest measurement per Ookla server](docs/screenshot-overview.png)
+*Current status — latest measurement per Ookla server, colour-coded by threshold.*
+
+> **Tip:** The timeline defaults to the last 3 hours but can be adjusted up to 30 days.
+> Use the **Address** filter at the top to isolate a specific monitor.
+
+### SQLite mode
+
+The built-in dashboard (`dashboard.py`) provides a lightweight browser-based view
+without any cloud accounts. Run `python3 dashboard.py` and open `http://localhost:8080`
+in your browser.
+
+![SQLite dashboard](docs/screenshot-sqlite.png)
+*Download, upload and ping over time — plus average download per server.
+No cloud accounts required.*
+
+---
+
 ## Quick start
 
 **Step 1 — Install the Ookla speedtest CLI** (required by both modes):
