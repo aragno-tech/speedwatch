@@ -12,6 +12,8 @@ from lib.speedwatch_lib import (
 )
 from lib.server_selector import get_server_candidates, record_server_used
 
+_last_stderr = ""
+
 
 def run_speedtest(server_id=None):
     server_arg = f" -s {server_id}" if server_id else ""
@@ -41,6 +43,7 @@ def parse_speedtest_json(response):
 
 def run_test_for_server(server_id=None):
     """Run a speedtest against the given server. Returns True on success, False on failure."""
+    global _last_stderr
     server_label = server_id if server_id else "closest"
 
     if is_throttle_blocked():
@@ -53,6 +56,7 @@ def run_test_for_server(server_id=None):
 
     try:
         stdout, stderr = run_speedtest(server_id)
+        _last_stderr = stderr
         if "Limit reached" in stderr or "Limit reached" in stdout:
             set_throttle_block()
             write_log(f"(Throttle) Ookla rate limit hit — blocking CLI for 1 hour")
@@ -62,12 +66,10 @@ def run_test_for_server(server_id=None):
         if not stdout:
             write_log(f"(Speedtest error) Server not found: {server_label}")
             write_server_log(f"SKIP server={server_label} reason=no_output stderr={stderr.strip()!r}")
-            send_email(f"Speedtest error: {DEVICE_HOST}", f"Server not found: {server_label}\n\n{stderr}", RECIPIENTS)
             return False
     except Exception as e:
         write_log(f"(Speedtest error) Exception for server {server_label}: {e}")
-        write_server_log(f"SKIP server={server_label} reason=exception error={str(e)!r} stderr={stderr.strip()!r}")
-        send_email(f"Speedtest error: {DEVICE_HOST}", f"Exception for server {server_label}\n\n{str(e)}\n\n{stderr}", RECIPIENTS)
+        write_server_log(f"SKIP server={server_label} reason=exception error={str(e)!r}")
         return False
 
     data = parse_speedtest_json(stdout)
@@ -189,7 +191,10 @@ if __name__ == "__main__":
                         break
             if not succeeded:
                 write_log("(Error) All servers failed — preferred and all fallbacks")
-                send_email(f"Speedtest error: {DEVICE_HOST}", "All servers failed — preferred and all fallbacks", RECIPIENTS)
+                if "ConfigurationError" in _last_stderr or "503" in _last_stderr:
+                    write_log("(Info) Feil skyldes midlertidig Ookla-nedetid (503) — e-post undertrykkes")
+                else:
+                    send_email(f"Speedtest error: {DEVICE_HOST}", "All servers failed — preferred and all fallbacks", RECIPIENTS)
 
     script_end_time = datetime.datetime.now()
     write_log(f"--END-- {script_start_time.strftime('%H:%M:%S')}->{script_end_time.strftime('%H:%M:%S')} --END--")
